@@ -1,0 +1,39 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-12"
+---
+
+```{r}
+library(terra)        # For spatial data manipulation
+library(raster)       # For handling raster data
+library(tidyverse)    # For data manipulation and visualization
+library(fasterize)    # For fast rasterization of spatial data
+library(exactextractr) # For fast exact extraction of raster values using polygons
+library(sf)           # For handling simple features (spatial vector data)
+```
+
+```{r}
+forest_spp_richness <- read_csv("../data/forest_spp_importance.csv")
+```
+
+```{r}
+# Plot the resulting raster of forest species richness
+plot(rast(forest_spp_richness))
+```
+
+```{r}
+# Plot histograms of richness importance and rwr importance
+hist(forest_spp_richness$richness_importance)
+hist(forest_spp_richness$rwr_importance)
+```
+
+```{r}
+# Plot linear models of richness importance against other variables
+forest_spp_richness |>
+  pivot_longer(-c(x, y, rwr_importance, richness_importance)) |>
+  ggplot(aes(x = value, y = richness_importance, color = name)) + 
+  geom_smooth(method = "lm", se = TRUE) +
+  theme_bw()
+```
+
