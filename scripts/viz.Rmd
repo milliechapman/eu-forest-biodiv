@@ -4,7 +4,26 @@ output: pdf_document
 date: "2024-08-12"
 ---
 
-```{r}
+Summary of Analysis:
+
+Assess the importance of forest areas for selected species by combining species distribution models (SDMs), forest management data, and species-specific threats. Full analysis code can be found in `scripts/forest-management-data.R`
+
+(1) Spatial Data Preparation:
+        - Forest Classification: The EU forest data is classified into three categories—natural, multi-use, and production forests—based. These classifications reflect different management intensities that affect forest quality and species habitats.
+
+(2) Species and Habitat Data Integration:
+        - Species-Specific Forest Preferences: The species distribution models are linked to European Environment Agency (EEA) habitat preferences, selecting only species that utilize woodland and forest habitats. 
+        - Forest Habitat Calculation: Forest data is aggregated to 10 km resolution grid for each forest type (natural, multi-use, and production)
+        
+(3) Threat Analysis:
+       - Species-Specific Threats: Threats to species are identified based on data from the Habitats and Birds Directives. These threats are linked to land cover data, which is classified by management intensity (natural, multi-use, and production).
+        - Threat Weighting: Threat levels are quantified based on their distribution across the species' habitats, with low, medium, and high threat levels identified using quantiles. The forest areas are then penalized based on the associated threat levels, adjusted by forest management intensity.
+
+(4) Habitat Suitability and Importance Calculation:
+        - Forest Area Adjustments: For each species, the forest area is adjusted according to the calculated threat levels. The range weight (RW) of the adjusted forest area to the overall habitat area of each species is calculated.
+        - Species Richness and Habitat Importance: The importance of each forest pixel is assessed by summing the adjusted habitat areas across all species. This results in two key metrics: species richness importance (based on total adjusted habitat area) and RW importance (based on the relative weight of adjusted habitats).
+
+```{r message=FALSE, warnings = FALSE}
 library(terra)        # For spatial data manipulation
 library(raster)       # For handling raster data
 library(tidyverse)    # For data manipulation and visualization
