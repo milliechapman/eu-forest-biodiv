@@ -252,6 +252,9 @@ spp_threats_weighted <- spp_threats |>
 
 # Calculate forest area adjustments based on the weighted threats
 pu_forest_spp_data <- pu_features_data |>
+  drop_na(value) |>
+  filter(value >0) |>
+  #mutate(value = replace_na(value,0)) |>
   filter(pixels > 19000) |>
   mutate(area_forest = (natural + multi + prod)) |>
   filter(area_forest > 0) |>
@@ -259,36 +262,119 @@ pu_forest_spp_data <- pu_features_data |>
   left_join(species_id) |> 
   left_join(spp_threats_weighted) |>
   drop_na(taxon_id) |>
-  dplyr::select(-c(value, speciesname)) |>
-  mutate(multi_adj = multi * WoodlandForest_multi,
-         prod_adj = prod * WoodlandForest_prod)
-
-# Group by species and calculate area of habitat and area of forest adjusted by threats
-pu_forest_adjustments <- pu_forest_spp_data |> 
+  dplyr::select(-c(speciesname)) |>
+  mutate(natural_spp = natural*value,
+         multi_spp = multi *value,
+         prod_spp = prod*value) |>
+  mutate(multi_spp_adj = multi * WoodlandForest_multi,
+         prod_spp_adj = prod * WoodlandForest_prod) |> 
   group_by(taxon_id) |>
-  mutate(area_forest_natural = sum(natural),
-         area_forest_multi = sum(multi_adj),
-         area_forest_prod = sum(prod_adj)) |>
+  # Group by species and calculate area of habitat and area of forest adjusted by threats
+  mutate(aoh_spp = sum(natural_spp + multi_spp_adj + prod_spp_adj)) |>
   ungroup() |>
-  mutate(aoh = (area_forest_natural + area_forest_multi + area_forest_prod) / pixels,
-         area_forest_adj = (natural + multi_adj + prod_adj) / pixels,
-         area_forest = (natural + multi + prod) / pixels) 
+  mutate(aoh_spp = aoh_spp / pixels) 
+
+rescale = function(x) (x - min(x)) / (max(x) - min(x))
+  
+  
+## richness natural 
+richness_natural <- pu_forest_spp_data |>
+  #filter(value == ifelse(natural > 0,value, 0)) |>
+  group_by(x, y) |>
+  summarise(richness_natural = sum(value, na.rm = T))|>
+  mutate(richness_natural = rescale(richness_natural))
+
+richness_multi <- pu_forest_spp_data |>
+  filter(value == value*WoodlandForest_multi) |>
+  group_by(x, y) |>
+  summarise(richness_multi = sum(value, na.rm = T),
+            area_multi = sum(multi, na.rm = T))
+
+plot(rast(richness_multi))
+
+richness_prod <- pu_forest_spp_data |>
+  filter(value == value*WoodlandForest_prod) |>
+  group_by(x, y) |>
+  summarise(richness_area_adj = sum(prod_spp_adj, na.rm = T),
+            richness = sum(value, na.rm = T),
+            area = sum(prod, na.rm = T))
+
+plot(rast(richness_prod))
 
 # Calculate forest species richness and importance based on adjusted forest area
-forest_spp_richness <- pu_forest_adjustments |>
-  mutate(rw = area_forest_adj / aoh) |>
+forest_spp_richness <- pu_forest_spp_data |>
+  drop_na() |>
+  #filter(aoh_spp > 50) |>
+  mutate(rw = (natural_spp + multi_spp_adj + prod_spp_adj) / aoh_spp,
+         richness = (natural_spp + multi_spp_adj + prod_spp_adj)) |>
   group_by(x, y) |>
   summarise(rwr_importance = sum(rw, na.rm = TRUE),
-            richness_importance = sum(area_forest_adj, na.rm = TRUE),
+            richness_importance = sum(richness, na.rm = TRUE),
             area_forest = mean(area_forest),
             area_natural = mean(natural) / pixels,
             area_multi = mean(multi) / pixels,
             area_prod = mean(prod) / pixels) |> 
-  ungroup() |>
+  ungroup() |> drop_na() |>
   mutate(rwr_importance = (rwr_importance - min(rwr_importance)) / 
            (max(rwr_importance) - min(rwr_importance)),
          richness_importance = (richness_importance - min(richness_importance)) / 
            (max(richness_importance) - min(richness_importance))) |>
   unique()
 
+plot(rast(forest_spp_richness))
 write_csv(forest_spp_richness, "data/forest_spp_importance.csv")
+
+
+
+############### not area weighted ##########
+
+# Calculate forest area adjustments based on the weighted threats
+pu_forest_spp_data_na <- pu_features_data |>
+  filter(pixels > 19000) |>
+  mutate(area_forest = (natural + multi + prod)) |>
+  filter(area_forest > 0) |>
+  rename(speciesname = name) |>
+  left_join(species_id) |> 
+  left_join(spp_threats_weighted) |>
+  drop_na(taxon_id) |>
+  mutate(WoodlandForest_natural = 1)
+
+# Group by species and calculate area of habitat and area of forest adjusted by threats
+pu_forest_adjustments_na <- pu_forest_spp_data_na |> 
+  group_by(taxon_id) |>
+  mutate(area_forest_natural = sum(natural),
+         area_forest_multi = sum(multi),
+         area_forest_prod = sum(prod)) |>
+  ungroup() |>
+  mutate(aoh = (area_forest_natural + area_forest_multi + area_forest_prod) / pixels)
+
+
+
+# Calculate forest species richness and importance 
+forest_spp_richness_na <- pu_forest_adjustments_na |>
+  group_by(x, y) |>
+  count() |>
+  arrange(n)
+  
+  summarise(richness_natural = sum(WoodlandForest_natural, na.rm = TRUE),
+            richness_prod = sum(WoodlandForest_prod, na.rm = TRUE),
+            richness_multi = sum(WoodlandForest_multi, na.rm = TRUE))
+
+hist(forest_spp_richness_na$richness_natural)
+
+
+,
+            rwr_natural = sum(WoodlandForest_natural/aoh, na.rm = TRUE),
+            rwr_prod = sum(WoodlandForest_prod/aoh, na.rm = TRUE),
+            rwr_multi = sum(WoodlandForest_multi/aoh, na.rm = TRUE)) |>
+  mutate(richness_natural = (richness_natural - min(richness_natural)) / 
+           (max(richness_natural) - min(richness_natural)),
+         rwr_natural = (rwr_natural - min(rwr_natural)) / 
+           (max(rwr_natural) - min(rwr_natural))) |>
+  unique()
+
+
+plot(rast(forest_spp_richness_na))
+write_csv(forest_spp_richness, "data/forest_spp_importance.csv")
+
+

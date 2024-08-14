@@ -35,24 +35,32 @@ library(sf)           # For handling simple features (spatial vector data)
 ```{r}
 forest_spp_richness <- read_csv("../data/forest_spp_importance.csv")
 ```
+Show aggregated forest data
+```{r}
+# forest area
+area <- forest_spp_richness |> dplyr::select(c(x:area_prod)) |> rast()
+plot(area)
+```
+Show species importance ranking:
 
+first, adjusted by the area of each forest type above and aggregated across all
 ```{r}
 # Plot the resulting raster of forest species richness
-plot(rast(forest_spp_richness))
+overall_biodiv <- forest_spp_richness |>
+  dplyr::select(x,y,rwr_importance_areaadj, richness_importance_areaaj) |>
+  rast()
+
+# note rwr is hard to see with this color scale but there is differentiation
+plot(overall_biodiv)
 ```
 
+Potential contributions of each cell by production type
 ```{r}
-# Plot histograms of richness importance and rwr importance
-hist(forest_spp_richness$richness_importance)
-hist(forest_spp_richness$rwr_importance)
+disaggregated_biodiv <- forest_spp_richness |>
+  dplyr::select(x,y,rwr_natural:richness_prod) |>
+  rast()
+plot(disaggregated_biodiv)
 ```
 
-```{r}
-# Plot linear models of richness importance against other variables
-forest_spp_richness |>
-  pivot_longer(-c(x, y, rwr_importance, richness_importance)) |>
-  ggplot(aes(x = value, y = richness_importance, color = name)) + 
-  geom_smooth(method = "lm", se = TRUE) +
-  theme_bw()
-```
+
 
